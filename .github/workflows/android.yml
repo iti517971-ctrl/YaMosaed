@@ -1,0 +1,59 @@
+name: Build YaMosaed APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '*.zip'
+      - '.github/workflows/android.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract project ZIP
+        run: |
+          mkdir -p extracted
+          found=false
+          for f in ./*.zip; do
+            if [ -f "$f" ]; then
+              unzip -q "$f" -d extracted
+              found=true
+            fi
+          done
+          if [ "$found" = false ]; then
+            echo "No ZIP file found"
+            exit 1
+          fi
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Build Android APK
+        run: |
+          GRADLEW=$(find extracted -type f -name gradlew | head -n 1)
+          if [ -z "$GRADLEW" ]; then
+            echo "gradlew was not found in the ZIP"
+            exit 1
+          fi
+          PROJECT_DIR=$(dirname "$GRADLEW")
+          cd "$PROJECT_DIR"
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: YaMosaed-APK
+          path: extracted/**/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
